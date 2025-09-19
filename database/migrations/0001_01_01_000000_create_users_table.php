@@ -34,8 +34,8 @@ return new class extends Migration
             $table->id()->primary();
             $table->foreignId('wallet_id')->constrained('wallets')->onDelete('cascade');
             $table->decimal('amount', 15, 2);
-            $table->string('type'); // e.g., 'credit', 'debit'
-            $table->string('status')->default('pending'); // e.g., 'pending', 'completed', 'failed'
+            $table->string(column: 'type'); //'credit', 'debit'
+            $table->string('status')->default('pending'); //'pending', 'completed', 'failed'
             $table->string('description')->nullable();
             $table->timestamps();
         });
