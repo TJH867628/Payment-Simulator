@@ -15,6 +15,7 @@
   </style>
 </head>
 <body class="d-flex justify-content-center align-items-center">
+
   <div class="card p-4 shadow w-100" style="max-width:400px;">
     <h2 class="text-center mb-4 text-danger">eWallet</h2>
 
@@ -28,17 +29,18 @@
     </ul>
 
     <div class="tab-content">
-      <!-- Login -->
+      <!-- ===== Login ===== -->
       <div class="tab-pane fade show active" id="login">
         <form onsubmit="login(event)">
-          <input type="email" id="loginEmail" class="form-control mb-2" placeholder="Email" required>
-          <input type="text"  id="loginPhone" class="form-control mb-2" placeholder="Phone Number" required>
-          <input type="password" id="loginPass" class="form-control mb-3" placeholder="Password" required>
+          <input type="text" id="loginIdentifier" class="form-control mb-2"
+                 placeholder="Email or Phone Number" required>
+          <input type="password" id="loginPass" class="form-control mb-3"
+                 placeholder="Password" required>
           <button class="btn btn-primary w-100">Login</button>
         </form>
       </div>
 
-      <!-- Register -->
+      <!-- ===== Register ===== -->
       <div class="tab-pane fade" id="register">
         <form onsubmit="register(event)">
           <input type="text"  id="regName"  class="form-control mb-2" placeholder="Full Name" required>
@@ -52,78 +54,80 @@
     </div>
   </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-<script>
-  // Include CSRF token header for Laravel
-  $.ajaxSetup({
-    headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') }
-  });
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 
-  function register(e){
-    e.preventDefault();
+  <script>
+    $.ajaxSetup({
+      headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') }
+    });
 
-    const name  = $('#regName').val().trim();
-    const email = $('#regEmail').val().trim();
-    const phone = $('#regPhone').val().trim();
-    const pass  = $('#regPass').val();
-    const confirm = $('#regConfirm').val();
+    function register(e){
+      e.preventDefault();
 
-    //Confirm password check
-    if (pass !== confirm) {
-      alert('Passwords do not match.');
-      $('#regConfirm').focus();
-      return;
+      const name  = $('#regName').val().trim();
+      const email = $('#regEmail').val().trim();
+      const phone = $('#regPhone').val().trim();
+      const pass  = $('#regPass').val();
+      const confirm = $('#regConfirm').val();
+
+      if (pass !== confirm) {
+        alert('Passwords do not match.');
+        $('#regConfirm').focus();
+        return;
+      }
+
+      $.ajax({
+        url: '/register',
+        type: 'POST',
+        data: JSON.stringify({ name, email, phone, password: pass }),
+        contentType: 'application/json',
+        success: function(res){
+          if(res.success){
+            alert(res.message || 'Registered! Please login.');
+            $('#regName,#regEmail,#regPhone,#regPass,#regConfirm').val('');
+            $('[data-bs-target="#login"]').tab('show');
+          } else {
+            alert(res.message || 'Registration failed.');
+          }
+        },
+        error: function(xhr){
+          alert('Server error: ' + xhr.status);
+        }
+      });
     }
 
-    $.ajax({
-      url: '/register',
-      type: 'POST',
-      data: JSON.stringify({
-        name: name,
-        email: email,
-        phone: phone,
-        password: pass
-      }),
-      contentType: 'application/json',
-      success: function(res){
-        if(res.success){
-          alert(res.message || 'Registered! Please login.');
-          $('#regName,#regEmail,#regPhone,#regPass,#regConfirm').val('');
-          $('[data-bs-target="#login"]').tab('show');
-        }else{
-          alert(res.message || 'Registration failed.');
-        }
-      },
-      error: function(xhr){
-        alert('Server error: ' + xhr.status);
-      }
-    });
-  }
+    function login(e){
+      e.preventDefault();
 
-  function login(e){
-    e.preventDefault();
-    const email = $('#loginEmail').val();
-    const phone = $('#loginPhone').val();
-    const pass  = $('#loginPass').val();
+      const identifier = $('#loginIdentifier').val().trim();
+      const pass       = $('#loginPass').val();
 
-    $.ajax({
-      url: '/login',
-      type: 'POST',
-      data: JSON.stringify({ email: email, phone: phone, password: pass }),
-      contentType: 'application/json',
-      success: function(res){
-        if(res.success){
-          window.location.href = '/dashboard';
-        }else{
-          alert(res.message || 'Invalid credentials');
-        }
-      },
-      error: function(xhr){
-        alert('Server error: ' + xhr.status);
+      let payload = { password: pass };
+      const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (emailPattern.test(identifier)) {
+        payload.email = identifier;
+      } else {
+        payload.phone = identifier;
       }
-    });
-  }
-</script>
+
+      $.ajax({
+        url: '/login',
+        type: 'POST',
+        data: JSON.stringify(payload),
+        contentType: 'application/json',
+        success: function(res){
+          if(res.success){
+            window.location.href = '/dashboard';
+          } else {
+            alert(res.message || 'Invalid credentials');
+          }
+        },
+        error: function(xhr){
+          alert('Server error: ' + xhr.status);
+        }
+      });
+    }
+  </script>
 </body>
 </html>
