@@ -22,20 +22,20 @@ class UserController extends Controller
                 'success' => false,
                 'field' => 'email',
                 'message' => 'Email already exists!'
-            ], 409);
+            ], 200);
         }else if(User::where('phone_number', $validated['phone_number'])->exists()) {
             return response()->json([
                 'success' => false,
                 'field' => 'phone_number',
                 'message' => 'Phone number already exists!'
-            ], 409);
+            ], 200);
         }
 
         $user = new User();
         $user->name = $validated['name'];
         $user->email = $validated['email'];
         $user->phone_number = $validated['phone_number'];
-        $user->password = hash('sha512', $validated['password']);
+        $user->password = Hash::make($validated['password']);
         $user->save();
 
         return response()->json([
@@ -49,11 +49,11 @@ class UserController extends Controller
     public function login(Request $request)
     {
         $account = $request->input('account');
-        $password = hash('sha512',$request->input('password'));
+        $password = $request->input('password');
 
         $user = User::where('email', $account)->orWhere('phone_number', $account)->first();
 
-        if($user && $user->password === $password) {
+        if($user && Hash::check($request->input('password'), $user->password)) {
             return response()->json([
                 'success' => true,
                 'message' => 'Login successful!',
