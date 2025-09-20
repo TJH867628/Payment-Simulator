@@ -88,7 +88,13 @@
             $('#regName,#regEmail,#regPhone,#regPass,#regConfirm').val('');
             $('[data-bs-target="#login"]').tab('show');
           } else {
-            alert(res.message || 'Registration failed.');
+            if (res.field == 'email') {
+              alert(res.message || 'email already exist.');
+            } else if (res.field == 'phone_number') {
+              alert(res.message || 'phone number already exist.');
+            }
+            else
+              alert(res.message || 'Registration failed.');
           }
         },
         error: function(xhr){
