@@ -67,7 +67,7 @@
 
       const name  = $('#regName').val().trim();
       const email = $('#regEmail').val().trim();
-      const phone = $('#regPhone').val().trim();
+      const phone_number = $('#regPhone').val().trim();
       const pass  = $('#regPass').val();
       const confirm = $('#regConfirm').val();
 
@@ -78,9 +78,9 @@
       }
 
       $.ajax({
-        url: '/register',
+        url: 'api/register',
         type: 'POST',
-        data: JSON.stringify({ name, email, phone, password: pass }),
+        data: JSON.stringify({ name, email, phone_number, password: pass }),
         contentType: 'application/json',
         success: function(res){
           if(res.success){
@@ -103,33 +103,31 @@
       });
     }
 
-    function login(e){
+    function login(e) {
       e.preventDefault();
 
       const identifier = $('#loginIdentifier').val().trim();
-      const pass       = $('#loginPass').val();
-
-      let payload = { password: pass };
-      const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (emailPattern.test(identifier)) {
-        payload.email = identifier;
-      } else {
-        payload.phone = identifier;
-      }
+      const pass = $('#loginPass').val();
+      console.log(identifier, pass);
+      // Always send as top-level keys: account + password
+      const payload = {
+        account: identifier,
+        password: pass
+      };
 
       $.ajax({
-        url: '/login',
+        url: 'api/login',
         type: 'POST',
         data: JSON.stringify(payload),
         contentType: 'application/json',
-        success: function(res){
-          if(res.success){
+        success: function(res) {
+          if (res.success) {
             window.location.href = '/dashboard';
           } else {
-            alert(res.message || 'Invalid credentials');
+            alert('Invalid credentials');
           }
         },
-        error: function(xhr){
+        error: function(xhr) {
           alert('Server error: ' + xhr.status);
         }
       });
