@@ -7,7 +7,6 @@
 
 <!-- CSRF token for Laravel requests -->
 <meta name="csrf-token" content="{{ csrf_token() }}">
-<meta name="user-id" content="{{ session('user') }}">
 
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <style>
@@ -42,7 +41,7 @@
     <div class="col-md-4">
       <div class="card text-center p-3 shadow h-100">
         <h4 class="text-danger">Balance</h4>
-        <h2 id="balance" ></h2>
+        <h2 id="balance">RM 0.00</h2>
       </div>
     </div>
 
@@ -51,16 +50,14 @@
       <div class="card p-3 shadow h-100">
         <h5 class="text-danger">Top Up</h5>
         <input type="number" id="topupAmount" class="form-control mb-2" placeholder="Amount">
-        <button class="btn btn-primary w-100" onclick="topUp()">Top Up</button>
+        <button id="topUpBtn" class="btn btn-primary w-100">Top Up</button>
       </div>
     </div>
 
-    <!-- Transfer -->
+    <!-- Transfer (unchanged demo) -->
     <div class="col-md-4">
       <div class="card p-3 shadow h-100">
         <h5 class="text-danger">Transfer</h5>
-
-        <!-- Tabs -->
         <ul class="nav nav-pills mb-3" id="transferTab" role="tablist">
           <li class="nav-item" role="presentation">
             <button class="nav-link active" id="phone-tab" data-bs-toggle="pill"
@@ -73,7 +70,6 @@
         </ul>
 
         <div class="tab-content">
-          <!-- Phone Transfer -->
           <div class="tab-pane fade show active" id="phoneTransfer">
             <input type="tel" id="transferPhoneNum" class="form-control mb-2"
                   placeholder="Recipient Phone Number">
@@ -81,8 +77,6 @@
                   placeholder="Amount">
             <button class="btn btn-primary w-100" onclick="transferPhone()">Transfer</button>
           </div>
-
-          <!-- QR Transfer -->
           <div class="tab-pane fade" id="qrTransfer">
             <div class="d-grid gap-2 mb-3">
               <button class="btn btn-warning" onclick="scanQR()">📷 Scan QR Code</button>
@@ -102,96 +96,112 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 
 <script>
-let balance = 0;
-let transactions = [];
-
-// ---------- UI Update ----------
-function updateUI(){
-  document.getElementById('balance').textContent = "RM " + balance.toFixed(2);
-  const list = document.getElementById('history');
-  list.innerHTML = transactions.map(t => `<li class="list-group-item">${t}</li>`).join('');
-}
-
-// ---------- Local Save ----------
-function save(){
-  localStorage.setItem('balance', balance);
-  localStorage.setItem('transactions', JSON.stringify(transactions));
-  updateUI();
-}
-
-// ---------- Top Up ----------
-function topUp(){
-  const amt = parseFloat(document.getElementById('topupAmount').value);
-  if(amt > 0){
-    balance += amt;
-    transactions.unshift(`Top Up RM ${amt.toFixed(2)}`);
-    save();
-  }
-}
-
-// ---------- Transfer Helpers ----------
-function transfer(recipient, amt){
-  if(recipient && amt>0 && amt<=balance){
-    balance -= amt;
-    transactions.unshift(`Transfer RM ${amt.toFixed(2)} to ${recipient}`);
-    save();
-  } else alert("Invalid transfer");
-}
-function transferPhone(){
-  const phone = document.getElementById('transferPhoneNum').value;
-  const amt   = parseFloat(document.getElementById('transferAmountPhone').value);
-  transfer(phone, amt);
-}
-
-// ---------- Mock QR ----------
-function scanQR(){
-  alert("✅ QR scanned (demo only)");
-}
-function chooseFromGallery(){
-  alert("✅ QR decoded from gallery (demo only)");
-}
-
 // ---------- Logout ----------
 function logout(){
   location.href='/';
 }
 
+// ---------- Transfer Helpers (demo only) ----------
+function transferPhone(){
+  const phone = document.getElementById('transferPhoneNum').value;
+  const amt   = parseFloat(document.getElementById('transferAmountPhone').value);
+  if(!phone || !amt) return alert("Invalid transfer");
+  alert(`(Demo) Transfer RM ${amt} to ${phone}`);
+}
+function scanQR(){ alert("✅ QR scanned (demo only)"); }
+function chooseFromGallery(){ alert("✅ QR decoded (demo only)"); }
+
+// ---------- Wallet / Top-Up / Transactions ----------
 document.addEventListener('DOMContentLoaded', () => {
-  const stored = sessionStorage.getItem('user');
-  if (!stored) {
+  // 1. Get logged-in user from sessionStorage (set in login.js)
+  const user = JSON.parse(sessionStorage.getItem('user'));
+  if (!user) {
     alert('Please log in again.');
-    location.href = '/';
+    window.location.href = '/';
     return;
   }
 
-  // Parse the JSON back into an object
-  const user = JSON.parse(stored);
-  const userId = user.id;  // 👈 this is the number you need
-  console.log('Fetching wallet for user id:', userId);
-
-  fetch(`/api/wallet/${userId}`, {
+  // 2. Fetch wallet info
+  fetch(`/api/wallet/${user.id}`, {
     method: 'GET',
-    credentials: 'include',
-    headers: {
-      'Accept': 'application/json',
-      'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-    }
+    credentials: 'include'
   })
-  .then(r => {
-    if (!r.ok) throw new Error('Unable to load wallet');
-    return r.json();
-  })
+  .then(r => { if(!r.ok) throw new Error('Wallet fetch failed'); return r.json(); })
   .then(data => {
-    balance = parseFloat(data.wallet.balance);
-    updateUI();
+    window.currentWalletId = data.wallet.id;  // save wallet id
+    document.getElementById('balance').textContent =
+      "RM " + parseFloat(data.wallet.balance).toFixed(2);
+    loadTransactions(window.currentWalletId);
   })
   .catch(err => {
     console.error(err);
-    alert('Could not fetch wallet info. Please log in again.');
+    alert('Could not fetch wallet info.');
   });
+
+  // 3. Bind Top-Up button
+  document.getElementById('topUpBtn').addEventListener('click', topUp);
 });
+
+function topUp(){
+  const amt = parseFloat(document.getElementById('topupAmount').value);
+  if(!amt || amt <= 0) return alert('Enter a valid amount');
+
+  $.ajax({
+    url: `/api/wallet/${window.currentWalletId}/topup`,
+    type: 'POST',
+    data: JSON.stringify({ amount: amt, description: 'Wallet top-up' }),
+    contentType: 'application/json',
+    dataType: 'json',
+    xhrFields: { withCredentials: true },
+    headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
+    success: function(res){
+      if(res.bill && res.bill[0] && res.bill[0].BillCode){
+        const billCode = res.bill[0].BillCode;
+        // Redirect to ToyyibPay payment page
+        window.location.href = `https://dev.toyyibpay.com/${billCode}`;
+      } else {
+        alert('Unable to create bill.');
+      }
+    },
+    error: function(xhr){
+      alert('Top-up error: ' + xhr.status);
+    }
+  });
+}
+
+function loadTransactions(walletId) {
+  $.ajax({
+    url: `/api/transactions/${walletId}`,
+    type: 'GET',
+    dataType: 'json',
+    xhrFields: { withCredentials: true },
+    success: function(res) {
+      const list = document.getElementById('history');
+
+      if (res.status === "Found" && Array.isArray(res.transactions)) {
+        list.innerHTML = res.transactions.map(t =>
+          `<li class="list-group-item">
+             ${t.type} RM ${parseFloat(t.amount).toFixed(2)}
+             – ${t.status} – ${new Date(t.created_at).toLocaleString()}
+           </li>`
+        ).join('');
+      }
+      else if (res.status === "NotFound") {
+        // Just one element—no need to map
+        list.innerHTML = `<li class="list-group-item text-center">
+                            <strong>No transaction found</strong>
+                          </li>`;
+      }
+    },
+    error: function(err) {
+      console.error(err);
+      alert('Could not load transactions');
+    }
+  });
+}
 
 </script>
 </body>

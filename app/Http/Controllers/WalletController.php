@@ -30,7 +30,7 @@ class WalletController extends Controller
     {
         $transactions = Transactions::where('wallet_id', $walletId)->get();
         if ($transactions->isEmpty()) {
-            return response()->json(['success' => true,'status' => 'NotFound','message' => 'No transactions found for this wallet'], status: 404);
+            return response()->json(['success' => true,'status' => 'NotFound','message' => 'No transactions found for this wallet'], status: 200);
         }
         return response()->json(['success' => true,'status' => 'Found','transactions' => $transactions], 200);
     }
@@ -76,7 +76,6 @@ class WalletController extends Controller
         curl_close($ch);
 
         $response = json_decode($result, true);
-        dd($result);
         if (!$response || isset($response['error'])) {
             return response()->json(['message' => 'Failed to create bill'], 500);
         }

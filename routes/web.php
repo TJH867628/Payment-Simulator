@@ -15,5 +15,5 @@ Route::get('/topup/success', function () {
 });
 
 Route::get('/topup/fail', function () {
-    return view('homepage/topUpFailPage');
+    return view('homepage/topUpFailedPage');
 });
