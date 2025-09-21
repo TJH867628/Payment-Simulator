@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Hash;
 use Illuminate\Http\Request;
 use App\Models\User;
+use App\Models\Wallet;
 
 class UserController extends Controller
 {
@@ -37,6 +38,12 @@ class UserController extends Controller
         $user->phone_number = $validated['phone_number'];
         $user->password = Hash::make($validated['password']);
         $user->save();
+
+        $wallet = new Wallet();
+        $wallet->user_id = $user->id;
+        $wallet->balance = 0.00;
+        $wallet->currency = 'MYR';
+        $wallet->save();
 
         return response()->json([
             'success' => true,
