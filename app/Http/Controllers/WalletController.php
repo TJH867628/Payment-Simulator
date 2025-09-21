@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use GrahamCampbell\ResultType\Success;
 use Illuminate\Http\Request;
 use App\Models\User;
 use App\Models\Wallet;
@@ -29,9 +30,9 @@ class WalletController extends Controller
     {
         $transactions = Transactions::where('wallet_id', $walletId)->get();
         if ($transactions->isEmpty()) {
-            return response()->json(['message' => 'No transactions found for this wallet'], 404);
+            return response()->json(['success' => true,'status' => 'NotFound','message' => 'No transactions found for this wallet'], status: 404);
         }
-        return response()->json(['transactions' => $transactions], 200);
+        return response()->json(['success' => true,'status' => 'Found','transactions' => $transactions], 200);
     }
 
     public function topUp(Request $request, $walletId)
