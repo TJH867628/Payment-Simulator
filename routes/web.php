@@ -10,10 +10,6 @@ Route::get('/dashboard', function () {
     return view('homepage/dashboard');
 });
 
-Route::get('/topup/success', function () {
-    return view('homepage/topUpSuccessPage');
-});
-
-Route::get('/topup/fail', function () {
-    return view('homepage/topUpFailedPage');
+Route::get('/topup/status', function () {
+    return view('homepage/topUpStatusPage');
 });

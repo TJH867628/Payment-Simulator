@@ -46,7 +46,7 @@ class WalletController extends Controller
         if (!$wallet) {
             return response()->json(['message' => 'Wallet not found'], 404);
         }
-
+        $externalRef = uniqid('TXN_');
         // Step 1: Prepare ToyyibPay payload
         $payload = [
             'userSecretKey' => '71iar8tc-l8u2-51fu-2whc-giva85ka529j',
@@ -56,9 +56,9 @@ class WalletController extends Controller
             'billPriceSetting' => 0,
             'billPayorInfo' => 1,
             'billAmount' => $validated['amount'] * 100, // ToyyibPay uses cents
-            'billReturnUrl' => 'http://127.0.0.1:8000/topup/success',
+            'billReturnUrl' => 'http://127.0.0.1:8000/topup/status',
             'billCallbackUrl' => 'http://127.0.0.1:8000/api/topup/callback',
-            'billExternalReferenceNo' => uniqid('TXN_'),
+            'billExternalReferenceNo' => $externalRef,
             'billTo' => $wallet->user->name ?? 'Customer',
             'billEmail' => $wallet->user->email ?? 'customer@example.com',
             'billPhone' => $wallet->user->phone_number ?? '0100000000',
@@ -66,7 +66,6 @@ class WalletController extends Controller
             'billChargeToCustomer' => 1,
         ];
 
-        // Step 2: Call ToyyibPay API
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, 'https://dev.toyyibpay.com/index.php/api/createBill');
         curl_setopt($ch, CURLOPT_POST, 1);
@@ -76,16 +75,19 @@ class WalletController extends Controller
         curl_close($ch);
 
         $response = json_decode($result, true);
+
         if (!$response || isset($response['error'])) {
-            return response()->json(['message' => 'Failed to create bill'], 500);
+             return view('homepage/topUpFailedPage', [
+                'message' => 'Failed to create bill. Please try again.'
+            ]);
         }
 
-        // Step 3: Store transaction with "pending" status
         $transaction = new Transactions();
         $transaction->wallet_id = $walletId;
         $transaction->amount = $validated['amount'];
         $transaction->type = 'top-up';
         $transaction->description = $validated['description'] ?? 'Wallet top-up';
+        $transaction->billcode = $response[0]['BillCode'] ?? null; // ToyyibPay bill code
         $transaction->status = 'pending'; // wait until ToyyibPay callback
         $transaction->save();
 
@@ -96,35 +98,63 @@ class WalletController extends Controller
         ], 200);
     }
 
-    public function topUpCallBack(Request $request)
+   public function topUpStatus($billCode)
     {
-        // Validate the callback data
-        $billCode = $request->input('billcode');
-        $status = $request->input('status');
-        $transactionId = $request->input('order_id');
-
-        // Find the transaction
-        $transaction = Transactions::where('id', $transactionId)->first();
+        // Find local transaction first
+        $transaction = Transactions::where('billcode', $billCode)->first();
         if (!$transaction) {
             return response()->json(['message' => 'Transaction not found'], 404);
         }
 
-        // Update transaction status based on ToyyibPay response
-        if ($status == '1') { // Payment successful
-            $transaction->status = 'completed';
-            
-            // Update wallet balance
-            $wallet = Wallet::find($transaction->wallet_id);
-            if ($wallet) {
-                $wallet->balance += $transaction->amount;
-                $wallet->save();
-            }
-        } else {
-            $transaction->status = 'failed';
+        // Prepare payload for ToyyibPay API
+        $payload = [
+            'billCode' => $billCode
+        ];
+
+        // Call ToyyibPay API
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, 'https://dev.toyyibpay.com/index.php/api/getBillTransactions');
+        curl_setopt($ch, CURLOPT_POST, 1);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+        $result = curl_exec($ch);
+        curl_close($ch);
+
+        $response = json_decode($result, true);
+
+        if (!$response || !isset($response[0])) {
+            return response()->json(['message' => 'Failed to fetch status from ToyyibPay'], 500);
         }
 
-        $transaction->save();
+        $bill = $response[0];
+        $statusCode = $bill['billpaymentStatus']; // 1=success, 2=pending, 3=failed
+        $amount = $bill['billpaymentAmount'];
 
-        return response()->json(['message' => 'Callback processed successfully'], 200);
+        // Update transaction and wallet based on status
+        if ($statusCode == '1') { // Success
+            if ($transaction->status !== 'completed') { // Only process if not already completed
+                $transaction->status = 'completed';
+                $transaction->save();
+
+                $wallet = Wallet::find($transaction->wallet_id);
+                if ($wallet) {
+                    $wallet->balance += $transaction->amount;
+                    $wallet->save();
+                }
+            }
+        } elseif ($statusCode == '3') { // Failed
+            $transaction->status = 'failed';
+            $transaction->save();
+        } else { // Pending
+            $transaction->status = 'pending';
+            $transaction->save();
+        }
+
+        return response()->json([
+            'status' => $transaction->status,
+            'amount' => $transaction->amount,
+            'billCode' => $transaction->billcode,
+            'toyyibAmount' => $amount
+        ]);
     }
 }

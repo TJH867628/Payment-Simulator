@@ -8,4 +8,4 @@ Route::post('/login', [UserController::class, 'login']);
 Route::get('/wallet/{userId}', [WalletController::class, 'getWalletByUserId']);
 Route::get('/transactions/{walletId}', [WalletController::class, 'getTransactionHistory']);
 Route::post('/wallet/{walletId}/topup', [WalletController::class, 'topUp']);  
-Route::post('/topup/callback', [WalletController::class, 'topUpCallback']);
+Route::get('/topup/status/{billCode}', [WalletController::class, 'topUpStatus']);
