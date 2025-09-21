@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Payment Simulator - Home</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <meta name="csrf-token" content="{{ csrf_token() }}"><!-- Needed for Laravel -->
+  <meta name="csrf-token" content="{{ csrf_token() }}">
   <style>
     body { background: linear-gradient(135deg,#ff4d4d,#ffcc00); min-height: 100vh; }
     .navbar { background-color: #b30000; }
@@ -116,21 +116,26 @@
       };
 
       $.ajax({
-        url: 'api/login',
-        type: 'POST',
-        data: JSON.stringify(payload),
-        contentType: 'application/json',
-        success: function(res) {
-          if (res.success) {
-            window.location.href = '/dashboard';
-          } else {
-            alert('Invalid credentials');
-          }
-        },
-        error: function(xhr) {
-          alert('Server error: ' + xhr.status);
+      url: '/api/login',
+      type: 'POST',
+      data: JSON.stringify(payload),
+      contentType: 'application/json',
+      dataType: 'json',
+      xhrFields: { withCredentials: true },
+      success: function(res) {
+        if (res.success) {
+          // store the entire user object as JSON
+          sessionStorage.setItem('user', JSON.stringify(res.user));
+          console.log('Logged in user:', res.user);
+          window.location.href = '/dashboard';
+        } else {
+          alert('Invalid credentials');
         }
-      });
+      },
+      error: function(xhr) {
+        alert('Server error: ' + xhr.status);
+      }
+    });
     }
   </script>
 </body>
