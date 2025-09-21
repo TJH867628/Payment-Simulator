@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\User;
 use App\Models\Wallet;
+use App\Models\Transactions;
 
 class WalletController extends Controller
 {
@@ -22,5 +23,14 @@ class WalletController extends Controller
         }
 
         return response()->json(['wallet' => $wallet], 200);
+    }
+
+    public function getTransactionHistory($walletId)
+    {
+        $transactions = Transactions::where('wallet_id', $walletId)->get();
+        if ($transactions->isEmpty()) {
+            return response()->json(['message' => 'No transactions found for this wallet'], 404);
+        }
+        return response()->json(['transactions' => $transactions], 200);
     }
 }
