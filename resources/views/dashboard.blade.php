@@ -128,8 +128,6 @@
                   placeholder="Recipient Phone Number">
             <input type="number" id="transferAmountPhone" class="form-control mb-2"
                   placeholder="Amount">
-            <input type="text" id="transferNote" class="form-control mb-3"
-                  placeholder="Note (optional)">
             <button class="btn btn-primary w-100" onclick="transferPhone()">Transfer</button>
           </div>
           <!-- Password modal stays the same -->
@@ -220,8 +218,6 @@
         <p id="qrTransferText" class="mb-3"></p>
         <input type="number" class="form-control mb-3" id="qrTransferAmount"
                placeholder="Amount (RM)">
-        <input type="text" class="form-control" id="qrTransferNote"
-               placeholder="Note (optional)">
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -247,14 +243,13 @@ function logout(){ location.href='/'; }
 function transferPhone() {
   const phone = document.getElementById('transferPhoneNum').value.trim();
   const amt   = parseFloat(document.getElementById('transferAmountPhone').value);
-  const note  = document.getElementById('transferNote').value.trim() || 'No note';
 
   if (!phone || isNaN(amt) || amt <= 0) {
-    return alert("Invalid transfer");
+    return alert("Enter a valid amount.");
   }
 
   // Store details temporarily and show the password modal
-  window.pendingTransfer = { phone, amt, note };
+  window.pendingTransfer = { phone, amt };
   new bootstrap.Modal(document.getElementById('passwordModal')).show();
 }
 
@@ -270,15 +265,24 @@ function confirmTransfer() {
     return;
   }
 
-  const { phone: toPhone, amt, note } = window.pendingTransfer;
+  const { phone: toPhone, amt } = window.pendingTransfer;
 
-  // ✅ NEW CHECK: prevent sending to your own number
+  // ✅ Prevent sending to yourself
   if (toPhone === user.phone_number) {
     alert("You can't transfer to your own phone number.");
-    return; // stop the process
+    return;
   }
 
-  // 1️⃣ Step 1: Verify password
+  // ✅ **NEW CHECK**: make sure there’s enough balance
+  const currentBalanceText = document.getElementById('balance').textContent;
+  // currentBalanceText looks like "RM 123.45" → strip non-digits except dot
+  const currentBalance = parseFloat(currentBalanceText.replace(/[^\d.]/g, ''));
+  if (isNaN(currentBalance) || amt > currentBalance) {
+    alert('Insufficient balance.');
+    return;
+  }
+
+  // Step 1: Verify password
   $.ajax({
     url: '/api/verifyPassword',
     type: 'POST',
@@ -299,7 +303,7 @@ function confirmTransfer() {
         return;
       }
 
-      // 2️⃣ Step 2: Perform the transfer
+      // Step 2: Perform the transfer
       $.ajax({
         url: '/api/transfer',
         type: 'POST',
@@ -309,7 +313,6 @@ function confirmTransfer() {
           from_phone: user.phone_number,
           to_phone: toPhone,
           amount: amt,
-          description: note
         }),
         headers: {
           'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
@@ -338,7 +341,7 @@ function confirmTransfer() {
         error: xhr2 => {
           let msg = 'Transfer failed';
           if (xhr2.responseJSON?.message) msg = xhr2.responseJSON.message;
-          alert('User not registered.');
+          alert(msg);
         }
       });
     },
@@ -481,7 +484,6 @@ document.getElementById('qrAmountConfirmBtn').addEventListener('click', () => {
   window.pendingTransfer = {
     phone: window.qrTransferPhone,
     amt:   amt,
-    note:  note
   };
 
   // Hide the amount modal
@@ -566,27 +568,27 @@ function loadTransactions(walletId) {
         );
 
         list.innerHTML = transactions.map(t => {
-          // Use description instead of type
-          const descText = (t.description || '').toLowerCase();
-          const isTopUp  = descText.includes('top');
+          const descText  = (t.description || '').toLowerCase();
+
+          const isTopUp   = descText.includes('top');
           const isReceive = descText.includes('transfer-in');
           const isSend    = descText.includes('transfer-out');
-          const isCredit  = isTopUp || isReceive;
 
-          // 🧑‍🤝‍🧑 Counterparty name (change key if different in your JSON)
           const otherUser = t.counterparty_name || t.partner_name || 'Unknown';
 
-          // 🎯 Human-friendly title
+          // Human-friendly title
           let title;
           if (isTopUp)        title = 'Top Up';
           else if (isReceive) title = `Receive from ${otherUser}`;
           else if (isSend)    title = `Transfer to ${otherUser}`;
           else                title = t.description || 'Transaction';
 
-          const icon      = isCredit ? '💰' : '📤';
-          const sign      = isCredit ? '+' : '-';
-          const amountCls = isCredit ? 'positive' : 'negative';
-          const dateStr   = new Date(t.created_at).toLocaleString();
+          // ✅ Green/+ if Top Up OR title starts with “Receive from”
+          const isPositive = isTopUp || title.toLowerCase().startsWith('receive from');
+          const amountCls  = isPositive ? 'positive' : 'negative';
+          const sign       = isPositive ? '+' : '-';
+          const icon       = isPositive ? '💰' : '📤';
+          const dateStr    = new Date(t.created_at).toLocaleString();
 
           return `
             <div class="transaction-item">
@@ -610,7 +612,6 @@ function loadTransactions(walletId) {
     error: () => alert('Could not load transactions')
   });
 }
-
 </script>
 </body>
 </html>
