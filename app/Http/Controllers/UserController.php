@@ -98,10 +98,8 @@ class UserController extends Controller
         return response()->json(['valid' => $isValid], 200);
     }
 
-    public function getUserByPhonenumber(Request $request)
+    public function getUserByPhonenumber(Request $request, $phone_number)
     {
-        $phone_number = $request->input('phone_number');
-
         //Find user by phone number
         $user = User::where('phone_number', $phone_number)->first();
 
