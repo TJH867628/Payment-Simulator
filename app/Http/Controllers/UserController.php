@@ -72,4 +72,19 @@ class UserController extends Controller
             ], 401);
         }
     }
+
+    public function verifyPassword(Request $request)
+    {
+        $id = $request->validate([
+            'id' => 'required|integer',
+            'password' => 'required|string|min:8',
+        ])['id'];
+        $user = User::find($id);
+        if (!$user) { 
+            return response()->json(['message' => 'User not found'], 404);
+        }
+
+        $isValid = Hash::check($request->input('password'), $user->password);
+        return response()->json(['valid' => $isValid], 200);
+    }
 }
