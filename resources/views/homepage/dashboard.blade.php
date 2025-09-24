@@ -330,15 +330,61 @@ function confirmTransfer() {
   });
 }
 
-let html5QrCode;
+let cameraStream;   // store stream to stop later
+let scanInterval;
+
 function scanQR() {
-  const modal = new bootstrap.Modal(document.getElementById('qrModal'));
+  const modalEl = document.getElementById('qrModal');
+  const modal   = new bootstrap.Modal(modalEl);
   modal.show();
-  html5QrCode = new Html5Qrcode("reader");
-  html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 },
-    qrMessage => { modal.hide(); html5QrCode.stop(); handleDecodedQR(qrMessage); },
-    () => {}
-  ).catch(err => alert("Camera start failed: " + err));
+
+  const reader = document.getElementById('reader');
+  reader.innerHTML =
+    '<video id="qrVideo" autoplay playsinline muted style="width:100%;"></video>';
+
+  const video = document.getElementById('qrVideo');
+
+  navigator.mediaDevices.getUserMedia({
+    video: { facingMode: { ideal: "environment" } }
+  })
+  .then(stream => {
+    cameraStream = stream;
+    video.srcObject = stream;
+
+    const canvas = document.createElement('canvas');
+    const ctx    = canvas.getContext('2d');
+
+    scanInterval = setInterval(() => {
+      if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        canvas.width  = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(imageData.data, canvas.width, canvas.height);
+        if (code) {
+          stopCamera();
+          modal.hide();
+          handleDecodedQR(code.data);
+        }
+      }
+    }, 300);
+  })
+  .catch(err => alert("Camera access failed: " + err));
+
+  modalEl.addEventListener('hidden.bs.modal', stopCamera, { once: true });
+}
+
+function stopCamera() {
+  if (scanInterval) {
+    clearInterval(scanInterval);
+    scanInterval = null;
+  }
+  if (cameraStream) {
+    cameraStream.getTracks().forEach(t => t.stop());
+    cameraStream = null;
+  }
+  const reader = document.getElementById('reader');
+  reader.innerHTML = ''; // clear video element
 }
 
 function chooseFromGallery() {
@@ -457,15 +503,26 @@ function loadTransactions(walletId) {
     xhrFields: { withCredentials: true },
     success: res => {
       const list = document.getElementById('history');
+
       if (res.status === "Found" && Array.isArray(res.transactions)) {
-        list.innerHTML = res.transactions.map(t => {
-          const isTopUp  = t.type?.toLowerCase().includes('top');
-          const isCredit = t.type?.toLowerCase().includes('receive') || isTopUp;
-          const icon     = isCredit ? '💰' : '📤';
-          const sign     = isCredit ? '+' : '-';
-          const amountCls= isCredit ? 'positive' : 'negative';
-          const title    = t.type || (isCredit ? 'Received' : 'Payment');
-          const dateStr  = new Date(t.created_at).toLocaleString();
+        // Sort by newest first
+        const transactions = [...res.transactions].sort(
+          (a, b) => new Date(b.created_at) - new Date(a.created_at)
+        );
+
+        list.innerHTML = transactions.map(t => {
+          const typeText  = (t.type || '').toLowerCase();
+          const isTopUp   = typeText.includes('top');
+          const isReceive = typeText.includes('transfer-in'); // ✅ specific check
+          const isCredit  = isTopUp || isReceive;
+
+          // Set styles and signs
+          const icon      = isCredit ? '💰' : '📤';
+          const sign      = isCredit ? '+' : '-';
+          const amountCls = isCredit ? 'positive' : 'negative';
+          const title     = t.type || (isCredit ? 'Received' : 'Payment');
+          const dateStr   = new Date(t.created_at).toLocaleString();
+
           return `
             <div class="transaction-item">
               <div class="transaction-left">
@@ -481,7 +538,8 @@ function loadTransactions(walletId) {
             </div>`;
         }).join('');
       } else {
-        list.innerHTML = `<div class="text-center p-4 text-muted"><strong>No transactions yet</strong></div>`;
+        list.innerHTML =
+          `<div class="text-center p-4 text-muted"><strong>No transactions yet</strong></div>`;
       }
     },
     error: () => alert('Could not load transactions')
