@@ -59,7 +59,7 @@ class WalletController extends Controller
             'userSecretKey' => '71iar8tc-l8u2-51fu-2whc-giva85ka529j',
             'categoryCode' => 't3cabxsj',
             'billName' => 'Wallet Top Up #' . $wallet->id,
-            'billDescription' => $validated['description'] ?? 'Wallet top-up',
+            'billDescription' => $validated['description'] ?? 'Wallet Top Up',
             'billPriceSetting' => 0,
             'billPayorInfo' => 1,
             'billAmount' => $validated['amount'] * 100, // ToyyibPay uses cents
@@ -216,7 +216,7 @@ class WalletController extends Controller
         $transactionOut->wallet_id = $fromWallet->id;
         $transactionOut->amount = $validated['amount'];
         $transactionOut->type = 'transfer-out';
-        $transactionOut->description = $validated['description'] ?? 'Transfer to ' . $toUser->name;
+        $transactionOut->description = 'Transfer to ' . $toUser->name . ' ' . $toUser->phone_number;
         $transactionOut->status = 'completed';
         $transactionOut->save();
 
@@ -224,7 +224,7 @@ class WalletController extends Controller
         $transactionIn->wallet_id = $toWallet->id;
         $transactionIn->amount = $validated['amount'];
         $transactionIn->type = 'transfer-in';
-        $transactionIn->description = $validated['description'] ?? 'Transfer from ' . $fromUser->name;
+        $transactionIn->description = 'Receive from ' . $fromUser->name . ' ' . $fromUser->phone_number;
         $transactionIn->status = 'completed';
         $transactionIn->save();
 
