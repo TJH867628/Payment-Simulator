@@ -566,10 +566,11 @@ function loadTransactions(walletId) {
         );
 
         list.innerHTML = transactions.map(t => {
-          const typeText  = (t.type || '').toLowerCase();
-          const isTopUp   = typeText.includes('top');
-          const isReceive = typeText.includes('transfer-in');
-          const isSend    = typeText.includes('transfer-out'); // assume this marks outgoing
+          // Use description instead of type
+          const descText = (t.description || '').toLowerCase();
+          const isTopUp  = descText.includes('top');
+          const isReceive = descText.includes('transfer-in');
+          const isSend    = descText.includes('transfer-out');
           const isCredit  = isTopUp || isReceive;
 
           // 🧑‍🤝‍🧑 Counterparty name (change key if different in your JSON)
@@ -577,10 +578,10 @@ function loadTransactions(walletId) {
 
           // 🎯 Human-friendly title
           let title;
-          if (isTopUp)       title = 'Top Up';
+          if (isTopUp)        title = 'Top Up';
           else if (isReceive) title = `Receive from ${otherUser}`;
           else if (isSend)    title = `Transfer to ${otherUser}`;
-          else                title = t.type || 'Transaction';
+          else                title = t.description || 'Transaction';
 
           const icon      = isCredit ? '💰' : '📤';
           const sign      = isCredit ? '+' : '-';
