@@ -71,6 +71,12 @@
       const pass  = $('#regPass').val();
       const confirm = $('#regConfirm').val();
 
+      if(pass.length < 8) {
+        alert('Password must be at least 8 characters long.');
+        $('#regPass').focus();
+        return;
+      }
+
       if (pass !== confirm) {
         alert('Passwords do not match.');
         $('#regConfirm').focus();
