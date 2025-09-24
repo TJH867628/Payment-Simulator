@@ -208,6 +208,29 @@
   </div>
 </div>
 
+<!-- Enter Amount Modal -->
+<div class="modal fade" id="qrAmountModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content p-3">
+      <div class="modal-header">
+        <h5 class="modal-title">Enter Transfer Amount</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p id="qrTransferText" class="mb-3"></p>
+        <input type="number" class="form-control mb-3" id="qrTransferAmount"
+               placeholder="Amount (RM)">
+        <input type="text" class="form-control" id="qrTransferNote"
+               placeholder="Note (optional)">
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-primary" id="qrAmountConfirmBtn">Continue</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <input type="file" accept="image/*" id="qrFileInput" style="display:none">
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
@@ -225,8 +248,6 @@ function transferPhone() {
   const phone = document.getElementById('transferPhoneNum').value.trim();
   const amt   = parseFloat(document.getElementById('transferAmountPhone').value);
   const note  = document.getElementById('transferNote').value.trim() || 'No note';
-
-  console.log(`Transfer to ${phone}, Amount: ${amt}, Note: ${note}`);
 
   if (!phone || isNaN(amt) || amt <= 0) {
     return alert("Invalid transfer");
@@ -417,23 +438,43 @@ document.getElementById('qrFileInput').addEventListener('change', async e => {
 });
 
 function handleDecodedQR(text) {
-  // text = phone number from QR
-  const amt = prompt("Enter amount to transfer to " + text + ":", "0.00");
-  if (!amt || isNaN(parseFloat(amt)) || parseFloat(amt) <= 0) {
-    alert("Invalid amount.");
+  // Show the modal and store the phone number
+  window.qrTransferPhone = text.trim();
+
+  document.getElementById('qrTransferText').innerHTML =
+    'Transfer to: <strong>' + window.qrTransferPhone + '</strong>';
+
+  // Clear previous input
+  document.getElementById('qrTransferAmount').value = '';
+  document.getElementById('qrTransferNote').value   = '';
+
+  new bootstrap.Modal(document.getElementById('qrAmountModal')).show();
+}
+
+document.getElementById('qrAmountConfirmBtn').addEventListener('click', () => {
+  const amtField  = document.getElementById('qrTransferAmount');
+  const noteField = document.getElementById('qrTransferNote');
+  const amt  = parseFloat(amtField.value);
+  const note = noteField.value.trim() || 'QR Transfer';
+
+  if (!amt || amt <= 0) {
+    alert('Please enter a valid amount.');
     return;
   }
 
-  // Store transfer details just like the manual form
+  // Prepare transfer just like manual form
   window.pendingTransfer = {
-    phone: text.trim(),
-    amt: parseFloat(amt),
-    note: 'QR Transfer'
+    phone: window.qrTransferPhone,
+    amt:   amt,
+    note:  note
   };
 
-  // ✅ Show the same password modal for confirmation
+  // Hide the amount modal
+  bootstrap.Modal.getInstance(document.getElementById('qrAmountModal')).hide();
+
+  // Show the password confirmation modal
   new bootstrap.Modal(document.getElementById('passwordModal')).show();
-}
+});
 
 function receive() {
   const user = JSON.parse(sessionStorage.getItem('user'));
