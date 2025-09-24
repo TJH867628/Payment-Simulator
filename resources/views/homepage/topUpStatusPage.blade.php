@@ -16,7 +16,7 @@
 
     <h1 id="statusTitle" class="fw-bold">Checking payment status...</h1>
     <p class="lead mt-3" id="statusText">Please wait while we confirm your top-up.</p>
-    <a href="/dashboard" class="btn btn-secondary mt-4">Back to Dashboard</a>
+    <a href="/dashboard" id="backBtn" class="btn btn-secondary mt-4 d-none">Back to Dashboard</a>
   </div>
 
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -31,13 +31,16 @@
             $('#statusIcon').html(`<path stroke="green" d="M7 13l3 3 7-7" />`);
             $('#statusTitle').text('Top-Up Successful!');
             $('#statusText').text(`RM ${parseFloat(res.amount).toFixed(2)} added to your wallet.`);
+            $('#backBtn').removeClass('d-none');          // ✅ show button
             clearInterval(interval);
           } else if (res.status === 'failed') {
             $('#statusIcon').html(`<path stroke="red" d="M6 6l12 12M6 18L18 6" />`);
             $('#statusTitle').text('Top-Up Failed');
             $('#statusText').text('Your payment could not be completed. Please try again.');
+            $('#backBtn').removeClass('d-none');          // ✅ show button
             clearInterval(interval);
-          } else {
+          }
+          else {
             $('#statusTitle').text('Payment Pending...');
             $('#statusText').text('Waiting for payment confirmation…');
           }

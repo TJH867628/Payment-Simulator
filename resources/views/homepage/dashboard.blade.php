@@ -128,6 +128,8 @@
                   placeholder="Recipient Phone Number">
             <input type="number" id="transferAmountPhone" class="form-control mb-2"
                   placeholder="Amount">
+            <input type="text" id="transferNote" class="form-control mb-3"
+                  placeholder="Note (optional)">
             <button class="btn btn-primary w-100" onclick="transferPhone()">Transfer</button>
           </div>
           <!-- Password modal stays the same -->
@@ -149,12 +151,34 @@
               </div>
             </div>
           </div>
+
           <div class="tab-pane fade" id="qrTransfer">
-            <div class="d-grid gap-2 mb-3">
+            <div class="d-grid gap-3 mb-3">
               <button class="btn btn-warning" onclick="scanQR()">📷 Scan QR Code</button>
+              <input type="file" id="qrFileInput" accept="image/*" hidden>
               <button class="btn btn-secondary" onclick="chooseFromGallery()">🖼️ Choose from Gallery</button>
+              <button class="btn btn-success" onclick="receive()">⬇️ Receive</button>
             </div>
           </div>
+
+          <!-- Receive QR Modal -->
+          <div class="modal fade" id="receiveModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+              <div class="modal-content text-center p-3">
+                <div class="modal-header border-0">
+                  <h5 class="modal-title w-100">Your Receive QR Code</h5>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                  <p class="mb-3">
+                    Scan this QR code to transfer to <strong><span id="receiveUserName"></span></strong>
+                  </p>
+                  <div id="receiveQrContainer" class="d-flex justify-content-center"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
@@ -188,18 +212,122 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 
 <script>
 // --- Logout ---
 function logout(){ location.href='/'; }
 
 // --- Transfer, QR, Wallet, Top-Up, and Transaction JS remain unchanged ---
+// Called when user clicks "Transfer" (already defined)
 function transferPhone() {
-  const phone = document.getElementById('transferPhoneNum').value;
+  const phone = document.getElementById('transferPhoneNum').value.trim();
   const amt   = parseFloat(document.getElementById('transferAmountPhone').value);
-  if (!phone || !amt) return alert("Invalid transfer");
-  window.pendingTransfer = { phone, amt };
+  const note  = document.getElementById('transferNote').value.trim() || 'No note';
+
+  console.log(`Transfer to ${phone}, Amount: ${amt}, Note: ${note}`);
+
+  if (!phone || isNaN(amt) || amt <= 0) {
+    return alert("Invalid transfer");
+  }
+
+  // Store details temporarily and show the password modal
+  window.pendingTransfer = { phone, amt, note };
   new bootstrap.Modal(document.getElementById('passwordModal')).show();
+}
+
+function confirmTransfer() {
+  const pwdField = document.getElementById('transferPassword');
+  const password = pwdField.value.trim();
+  if (!password) return alert('Please enter your password.');
+
+  const user = JSON.parse(sessionStorage.getItem('user'));
+  if (!user || !user.id || !user.phone_number) {
+    alert('User not registered. Please log in again.');
+    window.location.href = '/';
+    return;
+  }
+
+  const { phone: toPhone, amt, note } = window.pendingTransfer;
+
+  // ✅ NEW CHECK: prevent sending to your own number
+  if (toPhone === user.phone_number) {
+    alert("You can't transfer to your own phone number.");
+    return; // stop the process
+  }
+
+  // 1️⃣ Step 1: Verify password
+  $.ajax({
+    url: '/api/verifyPassword',
+    type: 'POST',
+    dataType: 'json',
+    contentType: 'application/json',
+    data: JSON.stringify({
+      id: user.id,
+      password: password
+    }),
+    headers: {
+      'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+    },
+    xhrFields: { withCredentials: true },
+
+    success: function (res) {
+      if (!res.valid) {
+        alert('Incorrect password.');
+        return;
+      }
+
+      // 2️⃣ Step 2: Perform the transfer
+      $.ajax({
+        url: '/api/transfer',
+        type: 'POST',
+        dataType: 'json',
+        contentType: 'application/json',
+        data: JSON.stringify({
+          from_phone: user.phone_number,
+          to_phone: toPhone,
+          amount: amt,
+          description: note
+        }),
+        headers: {
+          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+        },
+        xhrFields: { withCredentials: true },
+
+        success: function (res2) {
+          alert(res2.message || 'Transfer successful');
+          window.location.href = '/dashboard';
+          return;
+
+          if (typeof res2.from_wallet_balance !== 'undefined') {
+            document.getElementById('balance').textContent =
+              'RM ' + parseFloat(res2.from_wallet_balance).toFixed(2);
+          }
+
+          if (window.currentWalletId) {
+            loadTransactions(window.currentWalletId);
+          }
+
+          // Close modal and reset
+          bootstrap.Modal.getInstance(document.getElementById('passwordModal')).hide();
+          pwdField.value = '';
+          window.pendingTransfer = null;
+        },
+        error: xhr2 => {
+          let msg = 'Transfer failed';
+          if (xhr2.responseJSON?.message) msg = xhr2.responseJSON.message;
+          alert('User not registered.');
+        }
+      });
+    },
+
+    error: xhr => {
+      let msg = 'Password verification failed';
+      if (xhr.responseJSON?.message) msg = xhr.responseJSON.message;
+      alert(msg);
+    }
+  });
 }
 
 let html5QrCode;
@@ -212,15 +340,80 @@ function scanQR() {
     () => {}
   ).catch(err => alert("Camera start failed: " + err));
 }
-function chooseFromGallery() { document.getElementById('qrFileInput').click(); }
-document.getElementById('qrFileInput').addEventListener('change', e => {
+
+function chooseFromGallery() {
+  document.getElementById('qrFileInput').click();
+}
+
+document.getElementById('qrFileInput').addEventListener('change', async e => {
   const file = e.target.files[0];
   if (!file) return;
-  Html5Qrcode.scanFile(file, true)
-    .then(decodedText => handleDecodedQR(decodedText))
-    .catch(() => alert("No QR code found in image."));
+
+  const img = new Image();
+  img.src = URL.createObjectURL(file);
+
+  img.onload = () => {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    ctx.drawImage(img, 0, 0, img.width, img.height);
+
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const code = jsQR(imageData.data, canvas.width, canvas.height);
+
+    if (code) {
+      handleDecodedQR(code.data);
+    } else {
+      alert("No QR code found in image.");
+    }
+  };
 });
-function handleDecodedQR(text) { alert("QR Code detected: " + text); }
+
+function handleDecodedQR(text) {
+  // text = phone number from QR
+  const amt = prompt("Enter amount to transfer to " + text + ":", "0.00");
+  if (!amt || isNaN(parseFloat(amt)) || parseFloat(amt) <= 0) {
+    alert("Invalid amount.");
+    return;
+  }
+
+  // Store transfer details just like the manual form
+  window.pendingTransfer = {
+    phone: text.trim(),
+    amt: parseFloat(amt),
+    note: 'QR Transfer'
+  };
+
+  // ✅ Show the same password modal for confirmation
+  new bootstrap.Modal(document.getElementById('passwordModal')).show();
+}
+
+function receive() {
+  const user = JSON.parse(sessionStorage.getItem('user'));
+  if (!user || !user.name) {
+    alert('User info missing. Please log in again.');
+    return;
+  }
+
+  // Set the name text
+  document.getElementById('receiveUserName').textContent = user.name;
+
+  // Clear and regenerate the QR code
+  const qrDiv = document.getElementById('receiveQrContainer');
+  qrDiv.innerHTML = '';
+  new QRCode(qrDiv, {
+    text: user.phone_number,
+    width: 200,
+    height: 200,
+    colorDark: "#000",
+    colorLight: "#fff",
+    correctLevel: QRCode.CorrectLevel.H
+  });
+
+  // Show modal
+  new bootstrap.Modal(document.getElementById('receiveModal')).show();
+}
 
 document.addEventListener('DOMContentLoaded', () => {
   const user = JSON.parse(sessionStorage.getItem('user'));
