@@ -472,7 +472,7 @@ document.getElementById('qrAmountConfirmBtn').addEventListener('click', () => {
   const amtField  = document.getElementById('qrTransferAmount');
   const noteField = document.getElementById('qrTransferNote');
   const amt  = parseFloat(amtField.value);
-  const note = noteField.value.trim() || 'QR Transfer';
+  const note = 'QR Transfer';
 
   if (!amt || amt <= 0) {
     alert('Please enter a valid amount.');
