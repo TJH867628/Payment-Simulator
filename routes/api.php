@@ -11,3 +11,4 @@ Route::post('/wallet/{walletId}/topup', [WalletController::class, 'topUp']);
 Route::get('/topup/status/{billCode}', [WalletController::class, 'topUpStatus']);
 Route::post('/transfer', [WalletController::class, 'transferFunds']);
 Route::post('/verifyPassword', [UserController::class, 'verifyPassword']);
+Route::get('/getUserByEmail/{email}', [UserController::class, 'getUserByEmail']);

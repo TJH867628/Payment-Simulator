@@ -25,32 +25,39 @@
     const billCode = params.get('billcode');
 
     if (billCode) {
+       // Check payment every 3 seconds
       const interval = setInterval(() => {
         $.getJSON(`/api/topup/status/${billCode}`, function(res) {
+          // When payment success
           if (res.status === 'completed') {
             $('#statusIcon').html(`<path stroke="green" d="M7 13l3 3 7-7" />`);
             $('#statusTitle').text('Top-Up Successful!');
             $('#statusText').text(`RM ${parseFloat(res.amount).toFixed(2)} added to your wallet.`);
-            $('#backBtn').removeClass('d-none');          // ✅ show button
+            $('#backBtn').removeClass('d-none'); 
             clearInterval(interval);
+            
           } else if (res.status === 'failed') {
+            // When payment fail
             $('#statusIcon').html(`<path stroke="red" d="M6 6l12 12M6 18L18 6" />`);
             $('#statusTitle').text('Top-Up Failed');
             $('#statusText').text('Your payment could not be completed. Please try again.');
-            $('#backBtn').removeClass('d-none');          // ✅ show button
+            $('#backBtn').removeClass('d-none'); 
             clearInterval(interval);
           }
           else {
+            // When still waiting
             $('#statusTitle').text('Payment Pending...');
             $('#statusText').text('Waiting for payment confirmation…');
           }
         }).fail(() => {
+          // When server error
           $('#statusTitle').text('Error');
           $('#statusText').text('Unable to check payment status. Please try again later.');
           clearInterval(interval);
         });
       }, 3000);
     } else {
+      // If no billcode in URL
       $('#statusTitle').text('No Transaction Found');
       $('#statusText').text('No bill code provided in URL.');
     }

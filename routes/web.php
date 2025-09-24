@@ -4,12 +4,12 @@ use App\Http\Controllers\WalletController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
-    return view('homepage/homePage');
+    return view('homePage');
 });
 Route::get('/dashboard', function () {
-    return view('homepage/dashboard');
+    return view('dashboard');
 });
 
 Route::get('/topup/status', function () {
-    return view('homepage/topUpStatusPage');
+    return view('topUpStatusPage');
 });
