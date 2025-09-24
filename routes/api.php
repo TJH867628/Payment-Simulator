@@ -9,3 +9,4 @@ Route::get('/wallet/{userId}', [WalletController::class, 'getWalletByUserId']);
 Route::get('/transactions/{walletId}', [WalletController::class, 'getTransactionHistory']);
 Route::post('/wallet/{walletId}/topup', [WalletController::class, 'topUp']);  
 Route::get('/topup/status/{billCode}', [WalletController::class, 'topUpStatus']);
+Route::post('/transfer', [WalletController::class, 'transferFunds']);

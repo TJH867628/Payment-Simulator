@@ -157,4 +157,65 @@ class WalletController extends Controller
             'toyyibAmount' => $amount
         ]);
     }
+
+    public function transferFunds(Request $request)
+    {
+        $validated = $request->validate([
+            'from_phone' => 'required|string',
+            'to_phone' => 'required|string',
+            'amount' => 'required|numeric|min:1',
+            'description' => 'nullable|string|max:255',
+        ]);
+
+        $fromUser = User::where('phone_number', $validated['from_phone'])->first();
+        $toUser = User::where('phone_number', $validated['to_phone'])->first();
+
+        if (!$fromUser || !$toUser) {
+            return response()->json(['message' => 'One or both users not found'], 404);
+        }
+
+        $fromWallet = Wallet::where('user_id', $fromUser->id)->first();
+        $toWallet = Wallet::where('user_id', $toUser->id)->first();
+
+        if (!$fromWallet || !$toWallet) {
+            return response()->json(['message' => 'One or both wallets not found'], 404);
+        }
+
+        if ($fromWallet->balance < $validated['amount']) {
+            return response()->json(['message' => 'Insufficient balance'], 400);
+        }
+
+        // Deduct from sender
+        $fromWallet->balance -= $validated['amount'];
+        $fromWallet->save();
+
+        // Add to receiver
+        $toWallet->balance += $validated['amount'];
+        $toWallet->save();
+
+        // Record transactions
+        $transactionOut = new Transactions();
+        $transactionOut->wallet_id = $fromWallet->id;
+        $transactionOut->amount = $validated['amount'];
+        $transactionOut->type = 'transfer-out';
+        $transactionOut->description = $validated['description'] ?? 'Transfer to ' . $toUser->name;
+        $transactionOut->status = 'completed';
+        $transactionOut->save();
+
+        $transactionIn = new Transactions();
+        $transactionIn->wallet_id = $toWallet->id;
+        $transactionIn->amount = $validated['amount'];
+        $transactionIn->type = 'transfer-in';
+        $transactionIn->description = $validated['description'] ?? 'Transfer from ' . $fromUser->name;
+        $transactionIn->status = 'completed';
+        $transactionIn->save();
+
+        return response()->json([
+            'message' => 'Transfer successful',
+            'from_wallet_balance' => $fromWallet->balance,
+            'to_wallet_balance' => $toWallet->balance,
+            'transaction_out' => $transactionOut,
+            'transaction_in' => $transactionIn
+        ], 200);
+    }
 }
