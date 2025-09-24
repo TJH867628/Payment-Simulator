@@ -438,32 +438,35 @@ document.getElementById('qrFileInput').addEventListener('change', async e => {
 });
 
 function handleDecodedQR(text) {
+  // Save the scanned phone number
   window.qrTransferPhone = text.trim();
 
+  // 🔑 Fetch the user’s name by phone number
   fetch(`/api/getUserByPhonenumber/${encodeURIComponent(window.qrTransferPhone)}`, {
     credentials: 'include'
   })
-  .then(res => {
-    if (!res.ok) throw new Error('User lookup failed');
-    return res.json();
-  })
-  .then(data => {
-    // read the nested user object
-    const username = data.user.name || 'Unknown user';
+    .then(res => {
+      if (!res.ok) throw new Error('User lookup failed');
+      return res.json();
+    })
+    .then(data => {
+      // ✅ Get the username from your API response
+      const username = data.name || 'Unknown user';
 
-    console.log(data);
+      // ✅ Show both name and phone in the modal
+      document.getElementById('qrTransferText').innerHTML =
+        `Transfer to: <strong>${username} (${window.qrTransferPhone})</strong>`;
 
-    document.getElementById('qrTransferText').innerHTML =
-      `Transfer to: <strong>${username} (${window.qrTransferPhone})</strong>`;
+      // Clear previous inputs
+      document.getElementById('qrTransferAmount').value = '';
+      document.getElementById('qrTransferNote').value   = '';
 
-    document.getElementById('qrTransferAmount').value = '';
-    document.getElementById('qrTransferNote').value   = '';
-
-    new bootstrap.Modal(document.getElementById('qrAmountModal')).show();
-  })
-  .catch(err => {
-    alert('Could not fetch user details: ' + err.message);
-  });
+      // Open amount modal
+      new bootstrap.Modal(document.getElementById('qrAmountModal')).show();
+    })
+    .catch(err => {
+      alert('Could not fetch user details: ' + err.message);
+    });
 }
 
 document.getElementById('qrAmountConfirmBtn').addEventListener('click', () => {
@@ -561,6 +564,7 @@ function loadTransactions(walletId) {
       const list = document.getElementById('history');
 
       if (res.status === "Found" && Array.isArray(res.transactions)) {
+        // Sort by newest first
         const transactions = [...res.transactions].sort(
           (a, b) => new Date(b.created_at) - new Date(a.created_at)
         );
@@ -568,23 +572,14 @@ function loadTransactions(walletId) {
         list.innerHTML = transactions.map(t => {
           const typeText  = (t.type || '').toLowerCase();
           const isTopUp   = typeText.includes('top');
-          const isReceive = typeText.includes('transfer-in');
-          const isSend    = typeText.includes('transfer-out'); // assume this marks outgoing
+          const isReceive = typeText.includes('transfer-in'); // ✅ specific check
           const isCredit  = isTopUp || isReceive;
 
-          // 🧑‍🤝‍🧑 Counterparty name (change key if different in your JSON)
-          const otherUser = t.counterparty_name || t.partner_name || 'Unknown';
-
-          // 🎯 Human-friendly title
-          let title;
-          if (isTopUp)       title = 'Top Up';
-          else if (isReceive) title = `Receive from ${otherUser}`;
-          else if (isSend)    title = `Transfer to ${otherUser}`;
-          else                title = t.type || 'Transaction';
-
+          // Set styles and signs
           const icon      = isCredit ? '💰' : '📤';
           const sign      = isCredit ? '+' : '-';
           const amountCls = isCredit ? 'positive' : 'negative';
+          const title     = t.type || (isCredit ? 'Received' : 'Payment');
           const dateStr   = new Date(t.created_at).toLocaleString();
 
           return `
@@ -609,7 +604,6 @@ function loadTransactions(walletId) {
     error: () => alert('Could not load transactions')
   });
 }
-
 </script>
 </body>
 </html>
