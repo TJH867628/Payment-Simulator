@@ -454,13 +454,12 @@ function handleDecodedQR(text) {
     // read the nested user object
     const username = data.user.name || 'Unknown user';
 
-    console.log(data);
+    console.log('Scanned phone number:', window.qrTransferPhone, 'User:', username);
 
     document.getElementById('qrTransferText').innerHTML =
       `Transfer to: <strong>${username} (${window.qrTransferPhone})</strong>`;
 
     document.getElementById('qrTransferAmount').value = '';
-    document.getElementById('qrTransferNote').value   = '';
 
     new bootstrap.Modal(document.getElementById('qrAmountModal')).show();
   })
