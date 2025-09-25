@@ -32,7 +32,7 @@ class WalletController extends Controller
     public function getTransactionHistory($walletId)
     {
         //Get all transactions for the wallet
-        $transactions = Transactions::where('wallet_id', $walletId)->get();
+        $transactions = Transactions::where('wallet_id', $walletId)->where('status','completed')->get();
         if ($transactions->isEmpty()) {
             return response()->json(['success' => true,'status' => 'NotFound','message' => 'No transactions found for this wallet'], status: 200);
         }
@@ -187,7 +187,7 @@ class WalletController extends Controller
 
         //Error handling
         if (!$fromUser || !$toUser) {
-            return response()->json(['message' => 'One or both users not found'], 404);
+            return response()->json(['message' => 'Users not found'], 404);
         }
 
         //Get wallets
@@ -195,7 +195,7 @@ class WalletController extends Controller
         $toWallet = Wallet::where('user_id', $toUser->id)->first();
 
         if (!$fromWallet || !$toWallet) {
-            return response()->json(['message' => 'One or both wallets not found'], 404);
+            return response()->json(['message' => 'Wallets not found'], 404);
         }
 
         //Error handling
